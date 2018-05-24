@@ -4,9 +4,9 @@ Some analysis tools written in python for extacting frames and features from vid
 
 ## Just some figures...
 Marked-up frame:
-![picture alt]("https://github.com/cococastano/TangDropletAnalysis/tree/master/Figures/mark_up.png")
+![picture alt](./Figures/mark_up.png)
 
 Combining contour frame:
-![picture alt]("https://github.com/cococastano/TangDropletAnalysis/tree/master/Figures/combine_contour.png")
+![picture alt](https://github.com/cococastano/TangDropletAnalysis/tree/master/Figures/combine_contour.png)
 
 ### Stay tuned for code to preprocess videos and more!
