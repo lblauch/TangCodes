@@ -7,7 +7,8 @@ import extract_features
 # just some example code
 print('git TEST.')
 test_frame = data_utils.pull_frame_range(frame_range=[3],
-                                         num_break=1, num_nobreak=1)
+                                         num_break=1, num_nobreak=1,
+                                         add_flip=False)
 test_frame = test_frame[list(test_frame.keys())[0]][0]
 width = test_frame.shape[0]
 height = test_frame.shape[1]
@@ -20,7 +21,7 @@ height = test_frame.shape[1]
 n = 3  # number of vertices of polygon to interrogate
 frame_range = [i for i in range(0,21)]
 frames = data_utils.pull_frame_range(frame_range=frame_range,#frame_range,
-                                     num_break=5, num_nobreak=5)
+                                     num_break=5, num_nobreak=5, add_flip=False)
 # do some plotting to verify what we've got so far
 for frame_key in frames:
     for i, frame in enumerate(frames[frame_key]):      
@@ -32,12 +33,16 @@ for frame_key in frames:
         for c in centroids:
             cX = centroids[c][0]
             cY = centroids[c][1]
-            cv2.circle(show_frame, (cX,cY), 1, (0,0,255), 7)
-            cv2.putText(show_frame, str(c), (cX + 4, cY - 4),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
+            cv2.circle(show_frame, (cX,cY), 1, (110,110,110), 3)
         # add polygon with n vertices to show_frame
         leading_centroids, _ = \
             extract_features.get_n_leading_droplets_centroids(frame,n)
+        for c in leading_centroids:
+            cX = leading_centroids[c][0]
+            cY = leading_centroids[c][1]
+            cv2.circle(show_frame, (cX,cY), 1, (0,0,255), 7)
+            cv2.putText(show_frame, str(c), (cX + 4, cY - 4),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
         print('area: ', extract_features.polygon_area(leading_centroids), 
               '\t angle: ', 
               extract_features.leading_angle(leading_centroids)*180/np.pi,
@@ -66,6 +71,8 @@ for frame_key in frames:
         _,comb_cont_frame = extract_features.outer_perimeter(frame,
                                                              return_frame=True,
                                                              n=3)
+        comb_cont_frame = data_utils.resize_my_frame(frame=comb_cont_frame,
+                                                     scale_factor=2)
         # show show_frame
         # video.write(show_frame)
         cv2.imshow('mark up', show_frame)
