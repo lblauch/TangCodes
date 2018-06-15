@@ -7,7 +7,8 @@ import math
 
 
 def pull_frame_range(frame_range = [3], video_dir=None, num_break=None, 
-                     num_nobreak=None, save_option=False, add_flip=True):
+                     num_nobreak=None, save_option=False, add_flip=True,
+                     crop_at_constr=False, blur_im=False):
     """
     Returns a dictionary with break or nobreak keys for the 4th frame (by 
     default) or a list of a range of frames. There is built in randomness in 
@@ -22,12 +23,13 @@ def pull_frame_range(frame_range = [3], video_dir=None, num_break=None,
     save_option: save dictionaries to current directory if True
     add_flip: True to double the data set by providing a refelcted frame
         too that is effectively the same
+    crop_at_constr: True to crop frame at constriction
     
     example function call                
     my_frames = pull_frame_range(frame_range=[2,3,4], num_break=9, 
                                  num_nobreak=8)
     """
-
+    
     if video_dir == None:
         video_dir = 'C:/Users/nicas/Documents/' + \
                     'CS231N-ConvNNImageRecognition/' + \
@@ -75,7 +77,9 @@ def pull_frame_range(frame_range = [3], video_dir=None, num_break=None,
             # set frame index to be decoded
             vid.set(cv2.CAP_PROP_POS_FRAMES, f)
             ret, frame = vid.read()
+#            print(frame)
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            
             # check indices for non black and white (gray border)
             # assume a given video has same border, not all videos
             if i == 0:
@@ -87,8 +91,15 @@ def pull_frame_range(frame_range = [3], video_dir=None, num_break=None,
                 c2 = crop_locs[1][-1] + 1
             # crop out the gray border and normalize the array
             frame = frame[r1:r2, c1:c2]
+            # crop at constriction if option is on
+            if crop_at_constr is True:
+                constr_loc = find_constriction(frame)  # 120 for last set
+                frame = crop_my_frame(frame,[0,constr_loc,0,frame.shape[0]])
+            if blur_im is True:
+                frame = cv2.blur(frame,(3,3))
             # expect the pixel values to be 0 or 255 (some max) so...
             frame = np.uint8(frame)
+            frame = np.invert(frame)
             # append frame to dictionary under respective key
             try:
                 # try to append
@@ -104,9 +115,9 @@ def pull_frame_range(frame_range = [3], video_dir=None, num_break=None,
     
     return my_frames
 
-def get_data(num_train=2168, num_validation=400, num_test=200,
+def get_data(frame_range=[3], num_train=2168, num_validation=400, num_test=200,
              feature_list=['LEO','area','angle'], reshape_frames=False,
-             add_flip=True):
+             add_flip=True, crop_at_constr=False, blur_im=False):
     """
     Get data. If feature list is None, raw image data will be returned
     (i.e. pixels values) as vectors of reshaped data. Set reshape_frames 
@@ -116,6 +127,9 @@ def get_data(num_train=2168, num_validation=400, num_test=200,
     add_flip: True to double the data set by providing a refelcted frame
         too that is effectively the same (passed to pull_frame_range method)
     
+    crop_at_constr: True to crop all frames at the constriction (passed to 
+        pull_frame_range)
+    
     NOTE: this is not set up to pull frames from a range for raw image 
         processing; this will extract one frame (with its flipped version if
         specified) across all videos
@@ -124,33 +138,55 @@ def get_data(num_train=2168, num_validation=400, num_test=200,
     import extract_features
 
     # load data
-    my_frames = pull_frame_range(frame_range=[3], add_flip=add_flip)
+    num_break = int((num_train + num_validation + num_test)/2)
+    num_nobreak = int((num_train + num_validation + num_test)/2)
+    try:
+        # exception will be thrown if you call on more break/nobreak samples 
+        # than is available
+        my_frames = pull_frame_range(frame_range=frame_range, 
+                                     num_break=num_break,
+                                     num_nobreak=num_nobreak,
+                                     add_flip=add_flip, 
+                                     crop_at_constr=crop_at_constr,
+                                     blur_im=blur_im)
+    except:
+        my_frames = pull_frame_range(frame_range=frame_range, 
+                                     num_break=None,
+                                     num_nobreak=None,
+                                     add_flip=add_flip, 
+                                     crop_at_constr=crop_at_constr,
+                                     blur_im=blur_im)
+        
     # if add_flip is true you expect at twice as many frames
+    # frames_per_sample used for correct indexing of out arrays
     if add_flip is True: 
-        mult_fact = 2
+        frames_per_sample = 2*len(frame_range)
     else:
-        mult_fact = 1
+        frames_per_sample = 1*len(frame_range) 
     # construct X matrix and y vector
     try:
         n_features = len(feature_list)
-        X_data = np.zeros((len(my_frames)*mult_fact, n_features))
-        y_data = np.zeros((len(my_frames)*mult_fact, 1))
+        X_data = np.zeros((len(my_frames)*frames_per_sample, n_features))
+        y_data = np.zeros((len(my_frames)*frames_per_sample, 1))
     except:
         dum_key = list(my_frames.keys())
         dum_key = dum_key[0]
         dummy = my_frames[dum_key][0]
-        y_data = np.zeros((len(my_frames)*mult_fact, 1))
+        y_data = np.zeros((len(my_frames)*frames_per_sample, 1))
         
         if reshape_frames is True:
-            X_data = np.zeros((len(my_frames)*mult_fact, 
+            X_data = np.zeros((len(my_frames)*frames_per_sample, 
                                dummy.shape[0]*dummy.shape[1]))
         elif reshape_frames is False:
             # one color channel for grayscale
-            X_data = np.zeros((len(my_frames)*mult_fact, 1,
+            X_data = np.zeros((len(my_frames)*frames_per_sample, 1,
                                dummy.shape[0], dummy.shape[1]))
     
-    for i, key in zip(range(0, mult_fact*len(my_frames)+1, 2), 
-                      my_frames.keys()):
+    # step over axis of X_data by the number of frames per sample
+    for i, key in zip(range(0, frames_per_sample*len(my_frames)+1, 
+                            frames_per_sample), my_frames.keys()):
+        if i % 100 == 0: print('sampling dataset', i)
+        # loop over each frame
         for f, frame in enumerate(my_frames[key]):
             # note this will end up just taking features from the last frame
             # in the range!
@@ -178,7 +214,7 @@ def get_data(num_train=2168, num_validation=400, num_test=200,
                 y_data[i+f] = int(1)
             else:
                 y_data[i+f] = int(0)
-                    
+
     # make masks for partitioning data sets
     mask_train = list(range(0, num_train))
     mask_val = list(range(num_train, num_train + num_validation))
@@ -210,14 +246,87 @@ def get_data(num_train=2168, num_validation=400, num_test=200,
         X_test = X_data[mask_test,:,:,:]
     
     # and the targets vector y
-    y_data = y_data = y_data[rand_i,:]
+    y_data = y_data[rand_i,:]
+#    y_data = y_data = y_data[rand_i,:]
     y_train = y_data[mask_train]
     y_val = y_data[mask_val]
     y_test = y_data[mask_test]
     
     return X_train, y_train, X_val, y_val, X_test, y_test
 
-
+def get_opt_flow_data(num_train=3300, num_validation=300, num_test=188,
+                      opt_flow_frame_dir = None):
+    """
+    Relies on apriori use of mean_opt_flow script to extract mean optical 
+    frames that will be read in using this method. No flipped version is 
+    supplied, this should be done using the script to write optical flow 
+    frames.
+    """
+    if opt_flow_frame_dir is None:
+        opt_flow_frame_dir = 'C:/Users/nicas/Documents/' +\
+                             'CS231N-ConvNNImageRecognition/Project/' +\
+                             'opt_flow_datasets/first_six_frames_average' 
+    
+    break_files = []
+    nobreak_files = []
+    for subdir, dirs, files in os.walk(opt_flow_frame_dir):
+        for file in files:
+            file_name = subdir + os.sep + file
+            # lets not assume all files found are .avi video files
+            if 'break' and '.png' in file: 
+                break_files.append(file_name)
+            elif 'nobreak' and '.png' in file:
+                nobreak_files.append(file_name)
+    # dummy to get info on frame size
+    dummy = cv2.imread(break_files[0], cv2.IMREAD_COLOR)
+    # randomize all files in list
+    files = random.sample(break_files + nobreak_files, 
+                          len(break_files + nobreak_files))
+    # 3 color channels
+    X_data = np.zeros((len(files), dummy.shape[0], dummy.shape[1], 3))
+    y_data = np.zeros((len(files), 1))
+    # need to zero center and normalize at some point
+#    mean_r = 0
+#    mean_g = 0
+#    mean_b = 0
+    ims = []
+    for i, file in enumerate(files):
+        tags = file.split('\\')
+        flow_field = cv2.imread(file, cv2.IMREAD_COLOR)
+        flow_field = np.asarray(flow_field)
+        ims.append(flow_field)
+        if 'nobreak' in tags[-1]:
+            y_data[i] = int(1)
+        else:
+            y_data[i] = int(0)
+    X_data = np.array(ims, dtype='uint8')
+                    
+    # swap axes
+    X_data = np.swapaxes(X_data,1,3)
+    X_data = np.swapaxes(X_data,2,3)
+    # make masks for partitioning data sets
+    mask_train = list(range(0, num_train))
+    mask_val = list(range(num_train, num_train + num_validation))
+    mask_test = list(range(num_train + num_validation, 
+                           num_train + num_validation + num_test))
+    m = len(y_data)
+    rand_i = [i for i in range(m)]
+    rand_i = np.random.permutation(np.array(rand_i))
+    # randomize again
+    X_data = X_data[rand_i,:,:,:]
+    # train set
+    X_train = X_data[mask_train,:,:,:]
+    # validation set
+    X_val = X_data[mask_val,:,:,:]
+    # test set
+    X_test = X_data[mask_test,:,:,:]
+    # and the targets vector y
+    y_data = y_data = y_data[rand_i,:]
+    y_train = y_data[mask_train]
+    y_val = y_data[mask_val]
+    y_test = y_data[mask_test]
+    
+    return X_train, y_train, X_val, y_val, X_test, y_test
     
 def show_my_countours(frame, contours = -1, resize_frame=1, show=True):
     """  
@@ -259,12 +368,28 @@ def resize_my_frame(frame, scale_factor = 1):
     """
     Scale a given frame by a scale_factor
     """
-    row, col, _ = frame.shape
-    r = int(scale_factor*col/frame.shape[1])
-    dim = (scale_factor * col, int(frame.shape[0]*r))
-    out_frame = cv2.resize(frame,dim,interpolation=cv2.INTER_AREA)
+    try:
+        row, col, _ = frame.shape
+    except:
+        row, col = frame.shape
+    dim = (int(scale_factor * col), int(frame.shape[0]*scale_factor))
+    if scale_factor > 1:
+        out_frame = cv2.resize(frame,dim,interpolation=cv2.INTER_LINEAR)
+    else:
+        out_frame = cv2.resize(frame,dim,interpolation=cv2.INTER_AREA)
     
     return out_frame
+
+def crop_my_frame(frame,crop_locs):
+    """
+    Crop frame by list of crop_locs: [left_loc, right_loc, top_loc, bottom_loc]
+    """
+    r1 = crop_locs[2]
+    r2 = crop_locs[3]
+    c1 = crop_locs[0]
+    c2 = crop_locs[1]
+    frame = frame[r1:r2, c1:c2]
+    return frame
  
 def find_constriction(frame):
     """
