@@ -3,7 +3,7 @@
 Consolidation of Tang analysis codes written in Python and MATLAB for processing videos of droplets and stentor cells and for applying machine learning. 
 
 ## Droplet Analysis
-Previously written MATLAB code is provided and new tools written in Python are given to pick up some of the MATLAB codes functionality. 
+Python modules are given to pick up some of the previously written MATLAB codes. 
 
 ### For Python examples...
 See the *write_all_frames_to_dictionary.py* code for notes on setting up your working directory and *example_code.py* for some examples on implementation of methods and prodcuing figures like the ones seen below.
@@ -17,6 +17,13 @@ Combining contour frame: <br/>
 
 ## Machine Learning
 A starter pack for lab members to apply machine learning to their projects. A good starting point is *conv_nets.py* for predicting droplet breakup that relies heavily on *data_utils.py* for extracting preprocessed frames to set up the data structure. Again, see *write_all_frames_to_dictionary.py* for reference on setting up working directories. Modules are written using PyTorch.
+
+#### Convolutional autoencoder
+Epoch 
+
+#### Clustering by fully connected layer of encoded image
+Droplet break and no-break clustering by 50 node fully connected layer
+
 
 ## Miscellaneous
 Additional data anlaytics codes for reading and processing large text files from PMT signals, for example.
